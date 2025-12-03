@@ -1,8 +1,15 @@
 """3-stage LLM Council orchestration."""
 
 from typing import List, Dict, Any, Tuple
-from .openrouter import query_models_parallel, query_model
-from .config import COUNCIL_MODELS, CHAIRMAN_MODEL
+from .openrouter import query_models_parallel as query_openrouter_parallel, query_model as query_openrouter_model
+from .local import query_models_parallel as query_local_parallel, query_model as query_local_model
+from .config import (
+    COUNCIL_MODELS,
+    CHAIRMAN_MODEL,
+    PROVIDER,
+    LOCAL_MODELS,
+    CHAIRMAN_LOCAL_MODEL,
+)
 
 
 async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
@@ -17,8 +24,13 @@ async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
     """
     messages = [{"role": "user", "content": user_query}]
 
-    # Query all models in parallel
-    responses = await query_models_parallel(COUNCIL_MODELS, messages)
+    # Decide provider and model set
+    if PROVIDER == "local":
+        model_list = LOCAL_MODELS
+        responses = await query_local_parallel(model_list, messages)
+    else:
+        model_list = COUNCIL_MODELS
+        responses = await query_openrouter_parallel(model_list, messages)
 
     # Format results
     stage1_results = []
@@ -95,7 +107,12 @@ Now provide your evaluation and ranking:"""
     messages = [{"role": "user", "content": ranking_prompt}]
 
     # Get rankings from all council models in parallel
-    responses = await query_models_parallel(COUNCIL_MODELS, messages)
+    if PROVIDER == "local":
+        model_list = LOCAL_MODELS
+        responses = await query_local_parallel(model_list, messages)
+    else:
+        model_list = COUNCIL_MODELS
+        responses = await query_openrouter_parallel(model_list, messages)
 
     # Format results
     stage2_results = []
@@ -159,17 +176,22 @@ Provide a clear, well-reasoned final answer that represents the council's collec
     messages = [{"role": "user", "content": chairman_prompt}]
 
     # Query the chairman model
-    response = await query_model(CHAIRMAN_MODEL, messages)
+    if PROVIDER == "local":
+        response = await query_local_model(CHAIRMAN_LOCAL_MODEL, messages)
+        chairman_name = CHAIRMAN_LOCAL_MODEL
+    else:
+        response = await query_openrouter_model(CHAIRMAN_MODEL, messages)
+        chairman_name = CHAIRMAN_MODEL
 
     if response is None:
         # Fallback if chairman fails
         return {
-            "model": CHAIRMAN_MODEL,
+            "model": chairman_name,
             "response": "Error: Unable to generate final synthesis."
         }
 
     return {
-        "model": CHAIRMAN_MODEL,
+        "model": chairman_name,
         "response": response.get('content', '')
     }
 
