@@ -296,8 +296,14 @@ Title:"""
 
     messages = [{"role": "user", "content": title_prompt}]
 
-    # Use gemini-2.5-flash for title generation (fast and cheap)
-    response = await query_model("google/gemini-2.5-flash", messages, timeout=30.0)
+    # Generate title using appropriate provider
+    if PROVIDER == "local":
+        # Use a local model (prefer the first configured, fallback to chairman)
+        model_for_title = LOCAL_MODELS[0] if LOCAL_MODELS else CHAIRMAN_LOCAL_MODEL
+        response = await query_local_model(model_for_title, messages, timeout=30.0)
+    else:
+        # Use a fast OpenRouter model for title generation
+        response = await query_openrouter_model("google/gemini-2.5-flash", messages, timeout=30.0)
 
     if response is None:
         # Fallback to a generic title
