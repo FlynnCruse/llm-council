@@ -12,6 +12,88 @@ A reasoning model fine-tuned by NVIDIA for:
 
 Based on Llama 3.1 8B Instruct. Supports 128K context length.
 
+## Install Ollama (macOS / Linux / Windows)
+
+### macOS (Apple Silicon or Intel)
+
+```bash
+# Option A (recommended): Homebrew
+brew install ollama
+
+# Option B: Official installer
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Verify and quick test
+ollama --version
+ollama run llama3.2:3b "hi"
+```
+
+Notes:
+- Homebrew is for macOS/Linux only. For Windows, see the Windows section below.
+- Apple Silicon (M‑series) accelerates with Metal automatically.
+- If you prefer a foreground server: `ollama serve` (Ctrl+C to stop).
+
+### Linux (Ubuntu/Debian/Fedora/Arch)
+
+```bash
+# Install
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Start/enable service (systemd distros)
+sudo systemctl enable --now ollama
+
+# Verify
+ollama --version
+ollama list
+```
+
+GPU (optional):
+- NVIDIA: install recent NVIDIA driver + CUDA; verify with `nvidia-smi`.
+- If GPU isn’t available, Ollama falls back to CPU.
+
+### Windows 11/10
+
+```powershell
+# PowerShell (run as Administrator; requires winget)
+winget install Ollama.Ollama
+# If winget is unavailable, download the installer from: https://ollama.com
+
+# New terminal:
+ollama --version
+ollama run llama3.2:3b "hi"
+```
+
+Notes:
+- Allow Ollama (port 11434) through Windows Firewall on first run.
+- Alternative: WSL2 → install Ubuntu, then follow Linux steps inside WSL.
+
+## Add Models to Ollama
+
+You can either pull from the Ollama library or use local GGUF files.
+
+### Option A — Pull from library (1‑line)
+
+```bash
+ollama pull llama3.2:3b
+ollama run llama3.2:3b "hello"
+```
+
+### Option B — Use local GGUF (Nemotron examples below)
+
+See “Download” and “Additional Models (Optional)” sections for GGUF URLs and `Modelfile` examples to register:
+
+```bash
+# Example flow
+curl -L -o model.gguf "https://huggingface.co/.../model-Q4_K_M.gguf"
+cat > Modelfile << 'EOF'
+FROM ./model.gguf
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+EOF
+ollama create mymodel -f Modelfile
+ollama run mymodel "hi"
+```
+
 ## Usage
 
 ollama run nemotron
@@ -106,6 +188,13 @@ Notes
 - If the machine is tight on RAM, lower `LOCAL_MODELS` count or set `COUNCIL_MAX_PARALLEL_LOCAL=1–2`.
 - `COUNCIL_MEM_RESERVE_GB` keeps headroom for the OS/apps; increase if needed.
 
+### RAM Sizing & Safeguards (Council Local Mode)
+- Effective model budget ≈ `max(60% of RAM, RAM − COUNCIL_MEM_RESERVE_GB)`.
+- Recommended on 48 GiB Macs:
+  - Light multitasking: `COUNCIL_MEM_RESERVE_GB=8`
+  - Heavy multitasking: `COUNCIL_MEM_RESERVE_GB=10–12`
+- To reduce pressure: lower `COUNCIL_MAX_PARALLEL_LOCAL` or remove a model from `LOCAL_MODELS`.
+
 ## Additional Models (Optional)
 
 ### NVIDIA Nemotron Nano 9B v2
@@ -170,6 +259,20 @@ Run:
 ollama run nemotron12b "What are you?"
 ```
 
+## Manage Models & Disk Space
+
+```bash
+# See installed models and sizes
+ollama list
+
+# Remove a model to free space
+ollama rm nemotron9b
+```
+
+Notes:
+- GGUF files are several GB each; keep an eye on free disk space before downloads.
+- If using Council in local mode, ensure `LOCAL_MODELS` only includes models you actually need.
+
 ## Troubleshooting
 
 - Error: supplied file was not in GGUF format  
@@ -179,6 +282,12 @@ ollama run nemotron12b "What are you?"
   - Verify file size is several GB (ls -lh). Re-download if it’s only KB/MB.
 - zsh: command not found: llama  
   Use `ollama run ...` instead of `llama run`.
+- Connection refused to http://127.0.0.1:11434  
+  Start Ollama:  
+  - macOS/Windows: launch the app or run `ollama serve`  
+  - Linux: `sudo systemctl enable --now ollama`
+- Port 11434 already in use  
+  Stop whatever is bound to 11434, or change Ollama port/host (e.g., `OLLAMA_HOST=127.0.0.1:11435 ollama serve`) and update `OLLAMA_BASE_URL` in `.env`.
 
 ## Source
 
